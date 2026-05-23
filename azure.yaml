@@ -1,0 +1,10 @@
+name: explorative-scraping-pipeline
+metadata:
+  template: explorative-scraping-pipeline@0.1.0
+services:
+  functions:
+    project: .
+    language: python
+    host: function
+infra:
+  provider: bicep

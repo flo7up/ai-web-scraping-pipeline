@@ -1,0 +1,296 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.43.8.12551",
+      "templateHash": "17519844290411892062"
+    }
+  },
+  "parameters": {
+    "environmentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Environment name used as a suffix for resource names."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources."
+      }
+    },
+    "azureOpenAIEndpoint": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional Azure OpenAI endpoint. Leave empty to use deterministic extraction only."
+      }
+    },
+    "azureOpenAIDeployment": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional Azure OpenAI deployment name. Leave empty to use deterministic extraction only."
+      }
+    }
+  },
+  "variables": {
+    "normalizedName": "[toLower(replace(parameters('environmentName'), '-', ''))]",
+    "unique": "[uniqueString(resourceGroup().id, parameters('environmentName'))]",
+    "storageName": "[take(format('st{0}{1}', variables('normalizedName'), variables('unique')), 24)]",
+    "appInsightsName": "[format('appi-{0}', parameters('environmentName'))]",
+    "workspaceName": "[format('log-{0}', parameters('environmentName'))]",
+    "cosmosName": "[format('cosmos-{0}-{1}', parameters('environmentName'), take(variables('unique'), 6))]",
+    "planName": "[format('plan-{0}', parameters('environmentName'))]",
+    "functionName": "[format('func-{0}-{1}', parameters('environmentName'), take(variables('unique'), 6))]",
+    "databaseName": "explorative-pipeline",
+    "containers": [
+      {
+        "name": "PipelineConfig",
+        "pk": "/PartitionKey"
+      },
+      {
+        "name": "SourcePageRegistry",
+        "pk": "/pk"
+      },
+      {
+        "name": "CandidateQueue",
+        "pk": "/PartitionKey"
+      },
+      {
+        "name": "ReviewQueue",
+        "pk": "/PartitionKey"
+      },
+      {
+        "name": "Records",
+        "pk": "/PartitionKey"
+      },
+      {
+        "name": "PipelineRuns",
+        "pk": "/PartitionKey"
+      },
+      {
+        "name": "TokenUsage",
+        "pk": "/agentName"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[variables('storageName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "allowBlobPublicAccess": false,
+        "minimumTlsVersion": "TLS1_2"
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "name": "[variables('workspaceName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "retentionInDays": 30
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[variables('appInsightsName')]",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts",
+      "apiVersion": "2024-05-15",
+      "name": "[variables('cosmosName')]",
+      "location": "[parameters('location')]",
+      "kind": "GlobalDocumentDB",
+      "properties": {
+        "databaseAccountOfferType": "Standard",
+        "consistencyPolicy": {
+          "defaultConsistencyLevel": "Session"
+        },
+        "locations": [
+          {
+            "locationName": "[parameters('location')]",
+            "failoverPriority": 0,
+            "isZoneRedundant": false
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+      "apiVersion": "2024-05-15",
+      "name": "[format('{0}/{1}', variables('cosmosName'), variables('databaseName'))]",
+      "properties": {
+        "resource": {
+          "id": "[variables('databaseName')]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosName'))]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "sqlContainers",
+        "count": "[length(variables('containers'))]"
+      },
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+      "apiVersion": "2024-05-15",
+      "name": "[format('{0}/{1}/{2}', variables('cosmosName'), variables('databaseName'), variables('containers')[copyIndex()].name)]",
+      "properties": {
+        "resource": {
+          "id": "[variables('containers')[copyIndex()].name]",
+          "partitionKey": {
+            "paths": [
+              "[variables('containers')[copyIndex()].pk]"
+            ],
+            "kind": "Hash"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmosName'), variables('databaseName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2024-04-01",
+      "name": "[variables('planName')]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp",
+      "sku": {
+        "name": "FC1",
+        "tier": "FlexConsumption"
+      },
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2024-04-01",
+      "name": "[variables('functionName')]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp,linux",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
+        "httpsOnly": true,
+        "functionAppConfig": {
+          "runtime": {
+            "name": "python",
+            "version": "3.11"
+          },
+          "scaleAndConcurrency": {
+            "maximumInstanceCount": 20,
+            "instanceMemoryMB": 2048
+          },
+          "deployment": {
+            "storage": {
+              "type": "blobContainer",
+              "value": "[format('{0}app-package', reference(resourceId('Microsoft.Storage/storageAccounts', variables('storageName')), '2023-05-01').primaryEndpoints.blob)]",
+              "authentication": {
+                "type": "StorageAccountConnectionString",
+                "storageAccountConnectionStringName": "AzureWebJobsStorage"
+              }
+            }
+          }
+        },
+        "siteConfig": {
+          "appSettings": [
+            {
+              "name": "AzureWebJobsStorage",
+              "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};EndpointSuffix={1};AccountKey={2}', variables('storageName'), environment().suffixes.storage, listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageName')), '2023-05-01').keys[0].value)]"
+            },
+            {
+              "name": "FUNCTIONS_EXTENSION_VERSION",
+              "value": "~4"
+            },
+            {
+              "name": "FUNCTIONS_WORKER_RUNTIME",
+              "value": "python"
+            },
+            {
+              "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+              "value": "true"
+            },
+            {
+              "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+              "value": "[reference(resourceId('Microsoft.Insights/components', variables('appInsightsName')), '2020-02-02').ConnectionString]"
+            },
+            {
+              "name": "COSMOS_DATABASE_NAME",
+              "value": "[variables('databaseName')]"
+            },
+            {
+              "name": "CosmosDBConnection",
+              "value": "[listConnectionStrings(resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosName')), '2024-05-15').connectionStrings[0].connectionString]"
+            },
+            {
+              "name": "PIPELINE_CONFIG_PATH",
+              "value": "pipeline.config.json"
+            },
+            {
+              "name": "SOURCE_REFRESH_CRON",
+              "value": "0 0 3 * * *"
+            },
+            {
+              "name": "MAX_LINKS_PER_SOURCE",
+              "value": "25"
+            },
+            {
+              "name": "AZURE_OPENAI_ENDPOINT",
+              "value": "[parameters('azureOpenAIEndpoint')]"
+            },
+            {
+              "name": "AZURE_OPENAI_DEPLOYMENT",
+              "value": "[parameters('azureOpenAIDeployment')]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/components', variables('appInsightsName'))]",
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosName'))]",
+        "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "AZURE_FUNCTION_NAME": {
+      "type": "string",
+      "value": "[variables('functionName')]"
+    },
+    "AZURE_FUNCTION_URI": {
+      "type": "string",
+      "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/sites', variables('functionName')), '2024-04-01').defaultHostName)]"
+    },
+    "COSMOS_ACCOUNT_NAME": {
+      "type": "string",
+      "value": "[variables('cosmosName')]"
+    }
+  }
+}

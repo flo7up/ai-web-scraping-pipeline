@@ -1,0 +1,34 @@
+{
+  "projectName": "explorative-scraping-pipeline",
+  "recordType": "use_case",
+  "domainDescription": "Public examples of enterprise AI deployments and implementation patterns.",
+  "sourceDiscovery": {
+    "seedUrls": [],
+    "allowedDomains": [],
+    "blockedDomains": [],
+    "revisitFrequencyDays": 14,
+    "maxLinksPerSource": 25
+  },
+  "schema": {
+    "fields": [
+      { "name": "title", "type": "string", "required": true },
+      { "name": "organization", "type": "string", "required": false },
+      { "name": "summary", "type": "string", "required": true },
+      { "name": "sourceUrl", "type": "string", "required": true },
+      { "name": "useCaseType", "type": "string", "required": false },
+      { "name": "industry", "type": "string", "required": false },
+      { "name": "technologies", "type": "array", "required": false }
+    ]
+  },
+  "llm": {
+    "provider": "azure-openai",
+    "deploymentNameEnv": "AZURE_OPENAI_DEPLOYMENT",
+    "maxInputChars": 18000,
+    "temperature": 0.1
+  },
+  "quality": {
+    "requireSourceEvidence": true,
+    "reviewBeforeStore": true,
+    "duplicateDetection": true
+  }
+}
