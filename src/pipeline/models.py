@@ -32,6 +32,13 @@ class ExtractedRecord(BaseModel):
     industry: str | None = None
     technologies: list[str] = Field(default_factory=list)
     rawFields: dict[str, Any] = Field(default_factory=dict)
+    normalizedSourceUrl: str | None = None
+    sourceUrlHash: str | None = None
+    embedding: list[float] = Field(default_factory=list)
+    embeddingProfile: str | None = None
+    embeddingStatus: Literal["missing", "ready", "failed"] | None = None
+    duplicateReview: dict[str, Any] | None = None
+    groundedness: dict[str, Any] | None = None
     status: Literal["draft", "approved", "rejected"] = "draft"
     confidence: float = 0.5
     createdAt: str = Field(default_factory=utc_now_iso)

@@ -32,10 +32,29 @@ class LlmConfig(BaseModel):
     temperature: float = 0.1
 
 
+class EmbeddingConfig(BaseModel):
+    enabled: bool = True
+    deploymentNameEnv: str = "AZURE_OPENAI_EMBEDDING_DEPLOYMENT"
+    profile: str = "provider-neutral-v1"
+    dimensions: int = 3072
+    maxInputChars: int = 8000
+
+
+class GroundednessConfig(BaseModel):
+    enabled: bool = True
+    deploymentNameEnv: str = "AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT"
+    maxInputChars: int = 18000
+    threshold: float = 3.0
+    requirePass: bool = False
+
+
 class QualityConfig(BaseModel):
     requireSourceEvidence: bool = True
     reviewBeforeStore: bool = True
     duplicateDetection: bool = True
+    duplicateSimilarityThreshold: float = 0.85
+    duplicateConfidenceThreshold: float = 0.9
+    duplicateCandidateLimit: int = 8
 
 
 class PipelineConfig(BaseModel):
@@ -47,6 +66,8 @@ class PipelineConfig(BaseModel):
     sourceDiscovery: SourceDiscoveryConfig = Field(default_factory=SourceDiscoveryConfig)
     recordSchema: SchemaConfig = Field(default_factory=SchemaConfig, alias="schema")
     llm: LlmConfig = Field(default_factory=LlmConfig)
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    groundedness: GroundednessConfig = Field(default_factory=GroundednessConfig)
     quality: QualityConfig = Field(default_factory=QualityConfig)
 
 
