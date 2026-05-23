@@ -13,6 +13,15 @@
     },
     "azureOpenAIDeployment": {
       "value": ""
+    },
+    "azureOpenAIEmbeddingDeployment": {
+      "value": ""
+    },
+    "azureOpenAIGroundednessDeployment": {
+      "value": ""
+    },
+    "embeddingDimensions": {
+      "value": 3072
     }
   }
 }

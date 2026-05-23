@@ -26,9 +26,26 @@
     "maxInputChars": 18000,
     "temperature": 0.1
   },
+  "embedding": {
+    "enabled": true,
+    "deploymentNameEnv": "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
+    "profile": "provider-neutral-v1",
+    "dimensions": 3072,
+    "maxInputChars": 8000
+  },
+  "groundedness": {
+    "enabled": true,
+    "deploymentNameEnv": "AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT",
+    "maxInputChars": 18000,
+    "threshold": 3.0,
+    "requirePass": false
+  },
   "quality": {
     "requireSourceEvidence": true,
     "reviewBeforeStore": true,
-    "duplicateDetection": true
+    "duplicateDetection": true,
+    "duplicateSimilarityThreshold": 0.85,
+    "duplicateConfidenceThreshold": 0.9,
+    "duplicateCandidateLimit": 8
   }
 }

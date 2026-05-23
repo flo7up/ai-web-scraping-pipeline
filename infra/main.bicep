@@ -12,6 +12,16 @@ param createAzureAI bool = true
 @description('Optional Azure OpenAI / Foundry model deployment name. Leave empty to use deterministic extraction only.')
 param azureOpenAIDeployment string = ''
 
+@description('Optional Azure OpenAI embedding deployment name used for embedding-based duplicate detection.')
+param azureOpenAIEmbeddingDeployment string = ''
+
+@description('Optional Azure OpenAI / Foundry model deployment name used for groundedness checks. Leave empty to reuse deterministic groundedness fallback.')
+param azureOpenAIGroundednessDeployment string = ''
+
+@description('Embedding dimensions for the Records container vector policy. Match the configured embedding model deployment.')
+@minValue(1)
+param embeddingDimensions int = 3072
+
 var normalizedName = toLower(replace(environmentName, '-', ''))
 var unique = uniqueString(resourceGroup().id, environmentName)
 var storageName = take('st${normalizedName}${unique}', 24)
@@ -60,6 +70,11 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
   kind: 'GlobalDocumentDB'
   properties: {
     databaseAccountOfferType: 'Standard'
+    capabilities: [
+      {
+        name: 'EnableNoSQLVectorSearch'
+      }
+    ]
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'
     }
@@ -101,7 +116,6 @@ var containers = [
   { name: 'SourcePageRegistry', pk: '/pk' }
   { name: 'CandidateQueue', pk: '/PartitionKey' }
   { name: 'ReviewQueue', pk: '/PartitionKey' }
-  { name: 'Records', pk: '/PartitionKey' }
   { name: 'PipelineRuns', pk: '/PartitionKey' }
   { name: 'TokenUsage', pk: '/agentName' }
 ]
@@ -119,6 +133,53 @@ resource sqlContainers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/conta
     }
   }
 }]
+
+resource recordsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = {
+  parent: database
+  name: 'Records'
+  properties: {
+    resource: any({
+      id: 'Records'
+      partitionKey: {
+        paths: ['/PartitionKey']
+        kind: 'Hash'
+      }
+      vectorEmbeddingPolicy: {
+        vectorEmbeddings: [
+          {
+            path: '/embedding'
+            dataType: 'float32'
+            distanceFunction: 'cosine'
+            dimensions: embeddingDimensions
+          }
+        ]
+      }
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        automatic: true
+        includedPaths: [
+          {
+            path: '/*'
+          }
+        ]
+        excludedPaths: [
+          {
+            path: '/"_etag"/?'
+          }
+          {
+            path: '/embedding/*'
+          }
+        ]
+        vectorIndexes: [
+          {
+            path: '/embedding'
+            type: 'quantizedFlat'
+          }
+        ]
+      }
+    })
+  }
+}
 
 resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: planName
@@ -177,6 +238,8 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'MAX_LINKS_PER_SOURCE', value: '25' }
         { name: 'AZURE_OPENAI_ENDPOINT', value: createAzureAI ? aiServices!.properties.endpoint : '' }
         { name: 'AZURE_OPENAI_DEPLOYMENT', value: azureOpenAIDeployment }
+        { name: 'AZURE_OPENAI_EMBEDDING_DEPLOYMENT', value: azureOpenAIEmbeddingDeployment }
+        { name: 'AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT', value: azureOpenAIGroundednessDeployment }
       ]
     }
   }

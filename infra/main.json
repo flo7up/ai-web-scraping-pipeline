@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "10027385917394168298"
+      "templateHash": "6248085244523368803"
     }
   },
   "parameters": {
@@ -35,6 +35,28 @@
       "metadata": {
         "description": "Optional Azure OpenAI / Foundry model deployment name. Leave empty to use deterministic extraction only."
       }
+    },
+    "azureOpenAIEmbeddingDeployment": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional Azure OpenAI embedding deployment name used for embedding-based duplicate detection."
+      }
+    },
+    "azureOpenAIGroundednessDeployment": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional Azure OpenAI / Foundry model deployment name used for groundedness checks. Leave empty to reuse deterministic groundedness fallback."
+      }
+    },
+    "embeddingDimensions": {
+      "type": "int",
+      "defaultValue": 3072,
+      "minValue": 1,
+      "metadata": {
+        "description": "Embedding dimensions for the Records container vector policy. Match the configured embedding model deployment."
+      }
     }
   },
   "variables": {
@@ -63,10 +85,6 @@
       },
       {
         "name": "ReviewQueue",
-        "pk": "/PartitionKey"
-      },
-      {
-        "name": "Records",
         "pk": "/PartitionKey"
       },
       {
@@ -125,6 +143,11 @@
       "kind": "GlobalDocumentDB",
       "properties": {
         "databaseAccountOfferType": "Standard",
+        "capabilities": [
+          {
+            "name": "EnableNoSQLVectorSearch"
+          }
+        ],
         "consistencyPolicy": {
           "defaultConsistencyLevel": "Session"
         },
@@ -181,6 +204,58 @@
               "[variables('containers')[copyIndex()].pk]"
             ],
             "kind": "Hash"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmosName'), variables('databaseName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+      "apiVersion": "2024-05-15",
+      "name": "[format('{0}/{1}/{2}', variables('cosmosName'), variables('databaseName'), 'Records')]",
+      "properties": {
+        "resource": {
+          "id": "Records",
+          "partitionKey": {
+            "paths": [
+              "/PartitionKey"
+            ],
+            "kind": "Hash"
+          },
+          "vectorEmbeddingPolicy": {
+            "vectorEmbeddings": [
+              {
+                "path": "/embedding",
+                "dataType": "float32",
+                "distanceFunction": "cosine",
+                "dimensions": "[parameters('embeddingDimensions')]"
+              }
+            ]
+          },
+          "indexingPolicy": {
+            "indexingMode": "consistent",
+            "automatic": true,
+            "includedPaths": [
+              {
+                "path": "/*"
+              }
+            ],
+            "excludedPaths": [
+              {
+                "path": "/\"_etag\"/?"
+              },
+              {
+                "path": "/embedding/*"
+              }
+            ],
+            "vectorIndexes": [
+              {
+                "path": "/embedding",
+                "type": "quantizedFlat"
+              }
+            ]
           }
         }
       },
@@ -283,6 +358,14 @@
             {
               "name": "AZURE_OPENAI_DEPLOYMENT",
               "value": "[parameters('azureOpenAIDeployment')]"
+            },
+            {
+              "name": "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
+              "value": "[parameters('azureOpenAIEmbeddingDeployment')]"
+            },
+            {
+              "name": "AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT",
+              "value": "[parameters('azureOpenAIGroundednessDeployment')]"
             }
           ]
         }

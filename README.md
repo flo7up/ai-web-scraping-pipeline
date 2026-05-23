@@ -10,6 +10,8 @@ The project is a configurable version of an explorative scraping backend: bring 
 - Extracts readable text from public URLs.
 - Uses deterministic extraction by default and optional Azure OpenAI structured extraction.
 - Reviews records against a configurable schema.
+- Checks for duplicates by exact source identity and, when embeddings are configured, provider-neutral vector similarity.
+- Evaluates groundedness against the fetched source text and stores the score, result, reason, and threshold on approved records.
 - Stores candidates, review items, approved records, source pages, run logs, and token usage in Azure Cosmos DB.
 - Exposes HTTP endpoints for manual extraction, source screening, and searching stored records.
 - Deploys to Azure Functions with azd and Bicep.
@@ -21,11 +23,12 @@ Default deployment provisions:
 - Azure Functions on Linux Flex Consumption.
 - Azure Storage.
 - Azure Cosmos DB for NoSQL.
+- Cosmos DB vector search on the `Records` container for embedding-based duplicate detection.
 - Azure AI Services resource for Microsoft Foundry / Azure OpenAI compatible deployments.
 - Application Insights and Log Analytics.
 - Function app settings wired to Cosmos DB and the Azure AI endpoint.
 
-Model deployment is intentionally configurable: the template creates the Azure AI Services/Foundry-capable resource, then you choose a model deployment name and set `AZURE_OPENAI_DEPLOYMENT`. Deterministic extraction works without model calls.
+Model deployment is intentionally configurable: the template creates the Azure AI Services/Foundry-capable resource, then you choose deployment names and set `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_EMBEDDING_DEPLOYMENT`, and `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT` as needed. Deterministic extraction and deterministic groundedness fallback work without model calls.
 
 ## Quick Start
 
@@ -63,7 +66,7 @@ func start
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fflo7up%2Fexplorative-scraping-pipeline%2Fmain%2Finfra%2Fmain.json)
 
-The button deploys the generated ARM template in `infra/main.json` and provisions Azure Functions, Cosmos DB, Azure AI Services, Storage, and Application Insights. Use `azd up` when you want the full infrastructure + code deployment flow.
+The button deploys the generated ARM template in `infra/main.json` and provisions Azure Functions, Cosmos DB, Azure AI Services, Storage, and Application Insights. It also configures the `Records` container for Cosmos DB vector search. Use `azd up` when you want the full infrastructure + code deployment flow.
 
 ### Recommended: Azure Developer CLI
 
@@ -72,12 +75,13 @@ azd auth login
 azd up
 ```
 
-After deployment, if you want AI extraction instead of deterministic extraction:
+After deployment, configure the model deployments you want to use:
 
 1. Open the provisioned Azure AI Services resource in Microsoft Foundry.
-2. Deploy a chat model.
-3. Set the Function App setting `AZURE_OPENAI_DEPLOYMENT` to that deployment name.
-4. Keep `llm.maxInputChars` conservative until you understand token usage.
+2. Deploy a chat model and set `AZURE_OPENAI_DEPLOYMENT` for structured extraction.
+3. Deploy an embedding model and set `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` for vector duplicate detection.
+4. Optionally set `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT` for LLM groundedness checks; otherwise the pipeline uses deterministic token-overlap groundedness.
+5. Keep `llm.maxInputChars` and `groundedness.maxInputChars` conservative until you understand token usage.
 
 ### GitHub Actions
 
@@ -114,13 +118,15 @@ The pipeline behavior is controlled by `pipeline.config.json`:
 - seed URLs and allowed domains
 - output schema fields
 - LLM deployment settings
-- quality gates and duplicate behavior
+- embedding and groundedness deployment settings
+- quality gates, duplicate thresholds, and groundedness behavior
 
 ## Cost Controls
 
 The default configuration is conservative:
 
 - no model call is required for deterministic extraction
+- no model call is required for deterministic groundedness fallback
 - source text is truncated before model use
 - source pages have revisit intervals
 - candidate processing is queue based

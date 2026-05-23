@@ -8,8 +8,11 @@ flowchart LR
   Screen --> Candidate[CandidateQueue]
   Candidate --> Extract[CosmosCandidateTrigger]
   Extract --> Review[ReviewQueue]
-  Review --> Approve[CosmosReviewTrigger]
-  Approve --> Records[Records]
+  Review --> Quality[CosmosReviewTrigger quality gates]
+  Quality --> Duplicate{Duplicate?}
+  Duplicate -- yes --> Rejected[Review item rejected]
+  Duplicate -- no --> Grounded[Groundedness check]
+  Grounded --> Records[Records]
   Records --> Search[HttpSearchRecords]
 ```
 
@@ -17,7 +20,7 @@ flowchart LR
 
 - `HttpScreenSources`: discovers candidate URLs from seed pages.
 - `CosmosCandidateTrigger`: fetches candidate URLs and extracts structured records.
-- `CosmosReviewTrigger`: validates extracted records and stores approved output.
+- `CosmosReviewTrigger`: validates extracted records, checks duplicate signals, evaluates groundedness, and stores approved output.
 - `HttpExtractUrl`: manual one-off extraction endpoint.
 - `HttpSearchRecords`: simple read endpoint for approved records.
 - `TimerSourceRefresh`: revisits due source pages.
@@ -32,6 +35,14 @@ Cosmos DB containers are defined in `src/pipeline/cosmos.py`.
 - `Records`
 - `PipelineRuns`
 - `TokenUsage`
+
+The `Records` container is deployed with a vector policy on `/embedding`. Approved records can store provider-neutral embeddings so the review stage can find semantically similar existing records with Cosmos DB `VectorDistance`.
+
+## Quality Features
+
+- Deduplication: exact normalized source URL/hash matches are treated as duplicates. When `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` is configured, the review stage also creates provider-neutral embeddings and searches existing records by vector distance.
+- Duplicate signals: vector similarity is combined with title similarity, organization overlap, content overlap, and technology overlap before a record is rejected as a duplicate.
+- Groundedness: approved records are checked against the fetched source text. If `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT` is set, the check uses the configured model; otherwise it uses a deterministic token-overlap fallback. Results are stored on the record and review item.
 
 ## Configuration
 

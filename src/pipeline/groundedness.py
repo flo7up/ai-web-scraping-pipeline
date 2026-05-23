@@ -86,7 +86,7 @@ def deterministic_groundedness(record: ExtractedRecord | dict[str, Any], source_
 
 
 def llm_groundedness(record: ExtractedRecord | dict[str, Any], source_text: str, config: PipelineConfig) -> dict[str, Any] | None:
-    deployment = os.getenv(config.groundedness.deploymentNameEnv) or os.getenv(config.llm.deploymentNameEnv)
+    deployment = os.getenv(config.groundedness.deploymentNameEnv)
     if not deployment:
         return None
 
