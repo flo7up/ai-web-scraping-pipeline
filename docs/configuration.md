@@ -23,3 +23,16 @@ Schema fields describe the target record. Required fields are enforced by the re
 ## Environment Settings
 
 See `.env.example` and `local.settings.sample.json`.
+
+## Examples
+
+The `examples/` directory includes:
+
+- `aiusecasehub.pipeline.config.json`: AIUseCaseHub-style AI use case discovery.
+- `sustainability.pipeline.config.json`: sustainability and ESG project discovery.
+
+Copy an example over `pipeline.config.json`, then adjust seed URLs and schema fields.
+
+```powershell
+Copy-Item examples/aiusecasehub.pipeline.config.json pipeline.config.json
+```

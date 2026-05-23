@@ -7,6 +7,7 @@
     "CosmosDBConnection": "AccountEndpoint=https://localhost:8081/;AccountKey=...;",
     "COSMOS_DATABASE_NAME": "explorative-pipeline",
     "AZURE_OPENAI_ENDPOINT": "",
+    "AZURE_AI_SERVICES_ENDPOINT": "",
     "AZURE_OPENAI_DEPLOYMENT": "",
     "AZURE_OPENAI_API_KEY": "",
     "SOURCE_REFRESH_CRON": "0 0 3 * * *",

@@ -6,10 +6,10 @@ param environmentName string
 @description('Azure region for all resources.')
 param location string = resourceGroup().location
 
-@description('Optional Azure OpenAI endpoint. Leave empty to use deterministic extraction only.')
-param azureOpenAIEndpoint string = ''
+@description('Create an Azure AI Services resource for Microsoft Foundry / Azure OpenAI compatible model deployments.')
+param createAzureAI bool = true
 
-@description('Optional Azure OpenAI deployment name. Leave empty to use deterministic extraction only.')
+@description('Optional Azure OpenAI / Foundry model deployment name. Leave empty to use deterministic extraction only.')
 param azureOpenAIDeployment string = ''
 
 var normalizedName = toLower(replace(environmentName, '-', ''))
@@ -18,6 +18,7 @@ var storageName = take('st${normalizedName}${unique}', 24)
 var appInsightsName = 'appi-${environmentName}'
 var workspaceName = 'log-${environmentName}'
 var cosmosName = 'cosmos-${environmentName}-${take(unique, 6)}'
+var aiServicesName = take('ai-${environmentName}-${take(unique, 6)}', 64)
 var planName = 'plan-${environmentName}'
 var functionName = 'func-${environmentName}-${take(unique, 6)}'
 var databaseName = 'explorative-pipeline'
@@ -69,6 +70,19 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
         isZoneRedundant: false
       }
     ]
+  }
+}
+
+resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = if (createAzureAI) {
+  name: aiServicesName
+  location: location
+  kind: 'AIServices'
+  sku: {
+    name: 'S0'
+  }
+  properties: {
+    customSubDomainName: aiServicesName
+    publicNetworkAccess: 'Enabled'
   }
 }
 
@@ -161,7 +175,7 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'PIPELINE_CONFIG_PATH', value: 'pipeline.config.json' }
         { name: 'SOURCE_REFRESH_CRON', value: '0 0 3 * * *' }
         { name: 'MAX_LINKS_PER_SOURCE', value: '25' }
-        { name: 'AZURE_OPENAI_ENDPOINT', value: azureOpenAIEndpoint }
+        { name: 'AZURE_OPENAI_ENDPOINT', value: createAzureAI ? aiServices!.properties.endpoint : '' }
         { name: 'AZURE_OPENAI_DEPLOYMENT', value: azureOpenAIDeployment }
       ]
     }
@@ -171,3 +185,5 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
 output AZURE_FUNCTION_NAME string = functionApp.name
 output AZURE_FUNCTION_URI string = 'https://${functionApp.properties.defaultHostName}'
 output COSMOS_ACCOUNT_NAME string = cosmos.name
+output AZURE_AI_SERVICES_NAME string = createAzureAI ? aiServices!.name : ''
+output AZURE_AI_SERVICES_ENDPOINT string = createAzureAI ? aiServices!.properties.endpoint : ''

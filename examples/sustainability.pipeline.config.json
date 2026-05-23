@@ -1,0 +1,35 @@
+{
+  "projectName": "sustainability-project-discovery",
+  "recordType": "sustainability_project",
+  "domainDescription": "Public sustainability, climate, ESG, resource-efficiency, and environmental monitoring projects.",
+  "sourceDiscovery": {
+    "seedUrls": [],
+    "allowedDomains": [],
+    "blockedDomains": [],
+    "revisitFrequencyDays": 30,
+    "maxLinksPerSource": 15
+  },
+  "schema": {
+    "fields": [
+      { "name": "title", "type": "string", "required": true },
+      { "name": "organization", "type": "string", "required": true },
+      { "name": "summary", "type": "string", "required": true },
+      { "name": "sourceUrl", "type": "string", "required": true },
+      { "name": "sustainabilityTheme", "type": "string", "required": false },
+      { "name": "metric", "type": "string", "required": false },
+      { "name": "technology", "type": "string", "required": false },
+      { "name": "geography", "type": "string", "required": false }
+    ]
+  },
+  "llm": {
+    "provider": "azure-openai",
+    "deploymentNameEnv": "AZURE_OPENAI_DEPLOYMENT",
+    "maxInputChars": 14000,
+    "temperature": 0.1
+  },
+  "quality": {
+    "requireSourceEvidence": true,
+    "reviewBeforeStore": true,
+    "duplicateDetection": true
+  }
+}

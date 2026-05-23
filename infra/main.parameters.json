@@ -8,8 +8,8 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
-    "azureOpenAIEndpoint": {
-      "value": ""
+    "createAzureAI": {
+      "value": true
     },
     "azureOpenAIDeployment": {
       "value": ""

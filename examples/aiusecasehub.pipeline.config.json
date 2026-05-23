@@ -1,0 +1,46 @@
+{
+  "projectName": "aiusecasehub-style-pipeline",
+  "recordType": "ai_use_case",
+  "domainDescription": "Public enterprise AI deployment examples from customer stories, partner case studies, vendor blogs, and press releases.",
+  "sourceDiscovery": {
+    "seedUrls": [
+      "https://www.microsoft.com/en/customers/search",
+      "https://aws.amazon.com/solutions/case-studies/",
+      "https://cloud.google.com/customers"
+    ],
+    "allowedDomains": [
+      "microsoft.com",
+      "aws.amazon.com",
+      "cloud.google.com"
+    ],
+    "blockedDomains": [],
+    "revisitFrequencyDays": 14,
+    "maxLinksPerSource": 20
+  },
+  "schema": {
+    "fields": [
+      { "name": "title", "type": "string", "required": true },
+      { "name": "organization", "type": "string", "required": true },
+      { "name": "summary", "type": "string", "required": true },
+      { "name": "sourceUrl", "type": "string", "required": true },
+      { "name": "industry", "type": "string", "required": false },
+      { "name": "businessDomain", "type": "string", "required": false },
+      { "name": "technologies", "type": "array", "required": false },
+      { "name": "cloudProviders", "type": "array", "required": false },
+      { "name": "partners", "type": "array", "required": false },
+      { "name": "country", "type": "string", "required": false },
+      { "name": "evidenceQuote", "type": "string", "required": false }
+    ]
+  },
+  "llm": {
+    "provider": "azure-openai",
+    "deploymentNameEnv": "AZURE_OPENAI_DEPLOYMENT",
+    "maxInputChars": 18000,
+    "temperature": 0.1
+  },
+  "quality": {
+    "requireSourceEvidence": true,
+    "reviewBeforeStore": true,
+    "duplicateDetection": true
+  }
+}
