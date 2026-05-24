@@ -102,7 +102,13 @@ def llm_groundedness(record: ExtractedRecord | dict[str, Any], source_text: str,
     user_prompt = render_prompt_file(config.prompts.groundednessUser, prompt_values)
 
     try:
-        result = chat_json(system_prompt, user_prompt, deployment=deployment, temperature=0)
+        result = chat_json(
+            system_prompt,
+            user_prompt,
+            deployment=deployment,
+            temperature=0,
+            agent_name="review-agent-groundedness",
+        )
     except Exception as exc:
         logger.warning("LLM groundedness check failed: %s: %s", type(exc).__name__, exc)
         if config.allowDeterministicFallbackForSmokeTests:

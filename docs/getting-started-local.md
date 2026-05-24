@@ -58,6 +58,7 @@ Edit `local.settings.json` and fill in these values:
     "CosmosDBConnection": "<cosmos-db-connection-string>",
     "COSMOS_DATABASE_NAME": "explorative-pipeline",
     "AZURE_OPENAI_ENDPOINT": "https://<your-ai-service>.cognitiveservices.azure.com/",
+    "AZURE_AI_PROJECT_ENDPOINT": "<optional-foundry-project-endpoint-for-agent-framework>",
     "AZURE_OPENAI_DEPLOYMENT": "<chat-model-deployment>",
     "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": "<embedding-model-deployment>",
     "AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT": "<groundedness-model-deployment>",
@@ -72,6 +73,7 @@ Notes:
 
 - Keep `local.settings.json` out of git. It is already ignored.
 - For local development, an API key is usually the simplest Azure OpenAI auth path.
+- Set `AZURE_AI_PROJECT_ENDPOINT` when you want local chat-style LLM calls to use Microsoft Agent Framework and Foundry project authentication.
 - For production, prefer managed identity and role-based access where available.
 - `AzureWebJobsStorage=UseDevelopmentStorage=true` expects Azurite to be running.
 
@@ -88,13 +90,15 @@ Edit `pipeline.config.json`:
 - `domainDescription`: describe what you want to discover.
 - `sourceDiscovery.seedUrls`: add starting pages.
 - `sourceDiscovery.searchProvider`: set to `yandex` for a low-volume search-based smoke test.
-- `sourceDiscovery.searchQueries`: add search queries such as `site:example.com Example Domain`.
+- `sourceDiscovery.searchQueries`: add search queries such as `site:example.com Example Domain`, or leave it empty and let the Discovery agent use the configured LLM to generate search queries from the domain and schema.
 - `sourceDiscovery.allowedDomains`: add a domain allow-list for safer early tests.
 - `sourceDiscovery.maxLinksPerSource`: keep this low, such as `3` to `5`, for the first run.
 - `schema.fields`: define the structured fields you expect.
 - `prompts`: point to prompt files under `prompts/`.
 
 For a first local run, use one or two seed pages and a small link cap. This prevents accidental large crawls and keeps model costs predictable. For reliable search-based discovery, set `sourceDiscovery.searchProvider` to `google` and configure `GOOGLE_SEARCH_API_KEY` plus `GOOGLE_SEARCH_ENGINE_ID`. Yandex can be useful for small demos, but it may return captcha challenges instead of usable results.
+
+When `searchProvider` is `google` or `yandex` and `searchQueries` is empty, the Discovery agent calls the configured chat deployment to generate search terms.
 
 ## 6. Customize Prompts
 

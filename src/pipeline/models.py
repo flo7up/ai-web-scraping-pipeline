@@ -50,7 +50,7 @@ class ReviewItem(BaseModel):
     PartitionKey: str = "review"
     candidateId: str
     record: dict[str, Any]
-    status: Literal["queued", "approved", "rejected", "failed"] = "queued"
+    status: Literal["queued", "retrying", "approved", "rejected", "failed"] = "queued"
     createdAt: str = Field(default_factory=utc_now_iso)
     updatedAt: str = Field(default_factory=utc_now_iso)
     reasons: list[str] = Field(default_factory=list)

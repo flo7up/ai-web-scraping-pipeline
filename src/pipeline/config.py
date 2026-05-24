@@ -21,6 +21,7 @@ class SourceDiscoveryConfig(BaseModel):
     seedUrls: list[str] = Field(default_factory=list)
     searchProvider: Literal["none", "yandex", "google"] = "none"
     searchQueries: list[str] = Field(default_factory=list)
+    generatedSearchQueryCount: int = 3
     searchMaxResults: int = 10
     googleApiKeyEnv: str = "GOOGLE_SEARCH_API_KEY"
     googleSearchEngineIdEnv: str = "GOOGLE_SEARCH_ENGINE_ID"
@@ -50,10 +51,14 @@ class GroundednessConfig(BaseModel):
     deploymentNameEnv: str = "AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT"
     maxInputChars: int = 18000
     threshold: float = 3.0
+    rescrapeBelowScore: float = 4.0
+    maxRescrapeAttempts: int = 1
     requirePass: bool = False
 
 
 class PromptConfig(BaseModel):
+    discoverySystem: str = "prompts/discovery.system.md"
+    discoveryUser: str = "prompts/discovery.user.md"
     extractionSystem: str = "prompts/extraction.system.md"
     extractionUser: str = "prompts/extraction.user.md"
     groundednessSystem: str = "prompts/groundedness.system.md"

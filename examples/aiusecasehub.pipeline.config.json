@@ -10,6 +10,7 @@
     ],
     "searchProvider": "none",
     "searchQueries": [],
+    "generatedSearchQueryCount": 3,
     "searchMaxResults": 10,
     "googleApiKeyEnv": "GOOGLE_SEARCH_API_KEY",
     "googleSearchEngineIdEnv": "GOOGLE_SEARCH_ENGINE_ID",
@@ -43,7 +44,18 @@
     "maxInputChars": 18000,
     "temperature": 0.1
   },
+  "groundedness": {
+    "enabled": true,
+    "deploymentNameEnv": "AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT",
+    "maxInputChars": 18000,
+    "threshold": 3.0,
+    "rescrapeBelowScore": 4.0,
+    "maxRescrapeAttempts": 1,
+    "requirePass": false
+  },
   "prompts": {
+    "discoverySystem": "prompts/discovery.system.md",
+    "discoveryUser": "prompts/discovery.user.md",
     "extractionSystem": "prompts/extraction.system.md",
     "extractionUser": "prompts/extraction.user.md",
     "groundednessSystem": "prompts/groundedness.system.md",

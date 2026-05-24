@@ -64,7 +64,13 @@ def llm_extract(url: str, title: str, text: str, config: PipelineConfig) -> Extr
     system_prompt = render_prompt_file(config.prompts.extractionSystem, prompt_values)
     user_prompt = render_prompt_file(config.prompts.extractionUser, prompt_values)
 
-    data = chat_json(system_prompt, user_prompt, deployment=deployment, temperature=config.llm.temperature)
+    data = chat_json(
+        system_prompt,
+        user_prompt,
+        deployment=deployment,
+        temperature=config.llm.temperature,
+        agent_name="extraction-agent",
+    )
     if not data:
         if config.allowDeterministicFallbackForSmokeTests:
             return None

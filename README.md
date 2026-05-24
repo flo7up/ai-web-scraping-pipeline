@@ -8,7 +8,7 @@ The project is a configurable AI web scraping backend. You can define your own s
 
 ![AI Web Scraping Pipeline schematic](./ai-web-scraping-pipeline-overview-schematic.png)
 
-The schematic shows how discovered web signals move through Discovery, Extraction, and Review before landing in Cosmos DB for search. It uses queues as the mental model for handoff; in this implementation those handoffs are Cosmos DB containers named `CandidateQueue` and `ReviewQueue`, so the default deployment does not require a separate Azure Queue Storage resource. Microsoft Foundry or Azure OpenAI deployments are required for useful runtime processing: configure chat extraction, embedding, and groundedness deployments before operational runs.
+The schematic shows how discovered web signals move through Discovery, Extraction, and Review before landing in Cosmos DB for search. It uses queues as the mental model for handoff; in this implementation those handoffs are Cosmos DB containers named `CandidateQueue` and `ReviewQueue`, so the default deployment does not require a separate Azure Queue Storage resource. Microsoft Foundry or Azure OpenAI deployments are required for useful runtime processing: configure chat extraction, embedding, and groundedness deployments before operational runs. When `AZURE_AI_PROJECT_ENDPOINT` is configured, the agents route chat-style LLM calls through Microsoft Agent Framework, matching the AIUseCaseHub automation backend pattern.
 
 ## What It Does
 
@@ -18,6 +18,7 @@ The schematic shows how discovered web signals move through Discovery, Extractio
 - Reviews records against a configurable schema.
 - Checks for duplicates by exact source identity and, when embeddings are configured, provider-neutral vector similarity.
 - Evaluates groundedness against the fetched source text and stores the score, result, reason, and threshold on approved records.
+- Repeats scraping and extraction once when groundedness is below `4` before rejecting the item.
 - Stores candidates, review items, approved records, source pages, run logs, and token usage in Azure Cosmos DB.
 - Exposes HTTP endpoints for manual extraction, source screening, and searching stored records.
 - Deploys to Azure Functions with azd and Bicep (with flex-consumption plan)
@@ -30,7 +31,13 @@ The pipeline is organized as three logical agents running inside one Azure Funct
 2. **Extraction** is triggered by new candidate documents, fetches each candidate URL, extracts a structured record, and writes review items into the `ReviewQueue` Cosmos DB container.
 3. **Review** is triggered by new review documents, validates required fields, checks duplicate signals, evaluates groundedness against the source text, and stores approved records in the `Records` Cosmos DB container.
 
-The agent business logic lives in `src/pipeline/agents/`. The Azure Function files under `src/functions/` are thin trigger adapters. Prompt templates live in `prompts/` and are referenced from `pipeline.config.json`, so domain instructions can be changed without editing Python code.
+The best way to understand the pipeline is to start with the agent files in `src/pipeline/agents/`:
+
+- `discovery_agent.py`: uses the LLM to generate search queries when needed, finds candidate URLs from curated seed pages or search providers, applies domain filters, and writes candidates to `CandidateQueue`.
+- `extraction_agent.py`: fetches each candidate page, runs LLM structured extraction, and writes review items to `ReviewQueue`.
+- `review_agent.py`: validates extracted records, creates embeddings, checks duplicates, evaluates groundedness, and stores approved records in `Records`.
+
+The Azure Function files under `src/functions/` are thin trigger adapters around those agents. Prompt templates live in `prompts/` and are referenced from `pipeline.config.json`, so domain instructions can be changed without editing Python code.
 
 The HTTP endpoints let you manually screen sources, extract a single URL, and search approved records. A timer function revisits source pages on a configurable schedule. Cosmos DB stores source registry state, queue documents, review decisions, approved records, run logs, and token usage.
 
@@ -53,6 +60,8 @@ Default deployment provisions:
 - Function app settings wired to Cosmos DB and the Azure AI endpoint.
 
 Model deployment is required for the intended pipeline. The template creates the Azure AI Services/Foundry-capable resource, but it does not create model deployments for you. Before running real scraping jobs, deploy the models you want to use and set `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_EMBEDDING_DEPLOYMENT`, and `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT`. Leaving deployment names empty is only useful for infrastructure smoke tests, not for high-quality extraction and review.
+
+For Microsoft Agent Framework-backed chat calls, also set `AZURE_AI_PROJECT_ENDPOINT` to your Foundry project endpoint. If it is not set, the repo uses the Azure OpenAI-compatible endpoint path configured by `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY`.
 
 ## Quick Start
 
@@ -82,7 +91,7 @@ Edit `pipeline.config.json`:
 
 - `domainDescription`: what kind of records you want to find
 - `sourceDiscovery.seedUrls`: starting pages to explore
-- `sourceDiscovery.searchProvider` and `sourceDiscovery.searchQueries`: search-based discovery settings. Google Custom Search with `GOOGLE_SEARCH_API_KEY` and `GOOGLE_SEARCH_ENGINE_ID` is recommended for reliable discovery; Yandex is best treated as a low-volume demo fallback because it may return captcha challenges.
+- `sourceDiscovery.searchProvider` and `sourceDiscovery.searchQueries`: search-based discovery settings. When a search provider is enabled and `searchQueries` is empty, the Discovery agent asks the configured LLM to generate search queries from the domain and schema. Google Custom Search with `GOOGLE_SEARCH_API_KEY` and `GOOGLE_SEARCH_ENGINE_ID` is recommended for reliable discovery; Yandex is best treated as a low-volume demo fallback because it may return captcha challenges.
 - `sourceDiscovery.allowedDomains`: optional domain allow-list
 - `schema.fields`: the structured output fields
 

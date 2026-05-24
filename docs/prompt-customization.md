@@ -6,6 +6,8 @@ Default templates:
 
 - `prompts/extraction.system.md`
 - `prompts/extraction.user.md`
+- `prompts/discovery.system.md`
+- `prompts/discovery.user.md`
 - `prompts/groundedness.system.md`
 - `prompts/groundedness.user.md`
 
@@ -14,6 +16,8 @@ Configure different files with:
 ```json
 {
 	"prompts": {
+		"discoverySystem": "prompts/discovery.system.md",
+		"discoveryUser": "prompts/discovery.user.md",
 		"extractionSystem": "prompts/extraction.system.md",
 		"extractionUser": "prompts/extraction.user.md",
 		"groundednessSystem": "prompts/groundedness.system.md",
@@ -21,6 +25,15 @@ Configure different files with:
 	}
 }
 ```
+
+Discovery templates can use:
+
+- `domainDescription`
+- `recordType`
+- `schemaJson`
+- `allowedDomains`
+- `seedUrls`
+- `maxQueryCount`
 
 Extraction templates can use:
 

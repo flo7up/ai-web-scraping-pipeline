@@ -7,7 +7,7 @@ from src.pipeline.deduplication import apply_source_identity_fields, find_duplic
 from src.pipeline.embeddings import apply_embedding_fields, create_record_embedding
 from src.pipeline.groundedness import evaluate_groundedness
 from src.pipeline.http_client import fetch_page
-from src.pipeline.models import ExtractedRecord
+from src.pipeline.models import ExtractedRecord, utc_now_iso
 from src.pipeline.review import review_record
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,41 @@ def fetch_source_text(source_url: str) -> str:
     except Exception as exc:
         logger.warning("Groundedness source fetch failed for %s: %s: %s", source_url, type(exc).__name__, exc)
         return ""
+
+
+def groundedness_score(value: dict[str, Any] | None) -> float | None:
+    if not value:
+        return None
+    try:
+        return float(value.get("score"))
+    except (TypeError, ValueError):
+        return None
+
+
+def requeue_candidate_for_rescrape(candidate_id: str, reason: str, attempt: int) -> bool:
+    candidates = cosmos.query(
+        "candidates",
+        "SELECT TOP 1 * FROM c WHERE c.PartitionKey = @pk AND c.id = @id",
+        parameters=[{"name": "@pk", "value": "candidate"}, {"name": "@id", "value": candidate_id}],
+        enable_cross_partition_query=False,
+        partition_key="candidate",
+    )
+    if not candidates:
+        return False
+
+    candidate = candidates[0]
+    candidate["status"] = "queued"
+    candidate["error"] = None
+    candidate["updatedAt"] = utc_now_iso()
+    candidate["rescrapeAttempt"] = attempt
+    candidate["rescrapeReason"] = reason
+    cosmos.upsert("candidates", candidate)
+    return True
+
+
+def should_rescrape_for_groundedness(groundedness: dict[str, Any] | None, config: PipelineConfig) -> bool:
+    score = groundedness_score(groundedness)
+    return score is not None and score < config.groundedness.rescrapeBelowScore
 
 
 def review_item(item: dict[str, Any], config: PipelineConfig) -> dict[str, Any]:
@@ -45,6 +80,31 @@ def review_item(item: dict[str, Any], config: PipelineConfig) -> dict[str, Any]:
             source_text = fetch_source_text(record.sourceUrl)
             groundedness = evaluate_groundedness(record_data, source_text, config)
             record_data["groundedness"] = groundedness
+            if should_rescrape_for_groundedness(groundedness, config):
+                retry_count = int(item.get("scrapeRetryCount") or 0)
+                score = groundedness_score(groundedness)
+                reason = (
+                    f"Groundedness score {score:g} is below {config.groundedness.rescrapeBelowScore:g}; "
+                    "repeating scrape and extraction."
+                )
+                if retry_count < config.groundedness.maxRescrapeAttempts:
+                    next_attempt = retry_count + 1
+                    if requeue_candidate_for_rescrape(item["candidateId"], reason, next_attempt):
+                        item["duplicateReview"] = duplicate_review or {"status": "unique"}
+                        item["groundedness"] = groundedness
+                        item["scrapeRetryCount"] = next_attempt
+                        item["reasons"] = reasons + [reason]
+                        item["status"] = "retrying"
+                        item["updatedAt"] = utc_now_iso()
+                        return item
+                    approved = False
+                    reasons.append(f"{reason} Candidate {item['candidateId']} could not be requeued.")
+                else:
+                    approved = False
+                    reasons.append(
+                        f"Groundedness score {score:g} remained below {config.groundedness.rescrapeBelowScore:g} "
+                        f"after {retry_count} rescrape attempt(s)."
+                    )
             if config.groundedness.requirePass and groundedness.get("passed") is False:
                 approved = False
                 reasons.append(f"Groundedness check failed: {groundedness.get('reason')}")

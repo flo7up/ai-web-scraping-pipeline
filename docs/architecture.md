@@ -6,6 +6,8 @@ The pipeline is an Azure Functions app with queue-driven processing.
 
 The schematic shows the conceptual flow. The implementation uses Cosmos DB containers for queue-like handoff between agents rather than a separate Azure Queue Storage resource.
 
+When `AZURE_AI_PROJECT_ENDPOINT` is configured, chat-style LLM calls for Discovery, Extraction, and Review are made through Microsoft Agent Framework. The discovery search functions are decorated as Agent Framework tools. Embeddings still use the Azure OpenAI-compatible embeddings API.
+
 ```mermaid
 flowchart LR
   Source[Source pages] --> Screen[HttpScreenSources]
@@ -22,9 +24,11 @@ flowchart LR
 
 ## Main Runtime Components
 
-- `DiscoveryAgent` (`src/pipeline/agents/discovery_agent.py`): discovers candidate URLs from seed pages.
-- `ExtractionAgent` (`src/pipeline/agents/extraction_agent.py`): fetches candidate URLs and extracts structured records.
-- `ReviewAgent` (`src/pipeline/agents/review_agent.py`): validates extracted records, checks duplicate signals, evaluates groundedness, and stores approved output.
+Start with `src/pipeline/agents/` when reading the code. These files contain the pipeline business logic; the Azure Function files are mostly trigger adapters.
+
+- `DiscoveryAgent` (`src/pipeline/agents/discovery_agent.py`): uses the LLM to generate search queries when needed, finds candidate URLs from curated seed pages or search providers, applies domain filters, and writes candidates to `CandidateQueue`.
+- `ExtractionAgent` (`src/pipeline/agents/extraction_agent.py`): fetches each candidate page, runs LLM structured extraction, and writes review items to `ReviewQueue`.
+- `ReviewAgent` (`src/pipeline/agents/review_agent.py`): validates extracted records, creates embeddings, checks duplicates, evaluates groundedness, and stores approved records in `Records`.
 - `HttpScreenSources`: HTTP adapter for the discovery agent.
 - `CosmosCandidateTrigger`: Cosmos DB trigger adapter for the extraction agent.
 - `CosmosReviewTrigger`: Cosmos DB trigger adapter for the review agent.

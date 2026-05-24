@@ -1,5 +1,5 @@
 from . import cosmos
-from .models import CandidateRecord, ReviewItem
+from .models import CandidateRecord, ReviewItem, utc_now_iso
 
 
 def enqueue_candidate(url: str, discovered_from: str | None = None) -> CandidateRecord:
@@ -18,6 +18,16 @@ def enqueue_review(candidate_id: str, record: dict) -> ReviewItem:
         partition_key="review",
     )
     if existing:
+        existing_item = existing[0]
+        if existing_item.get("status") in {"retrying", "failed"}:
+            existing_item["record"] = record
+            existing_item["status"] = "queued"
+            existing_item["reasons"] = []
+            existing_item["groundedness"] = None
+            existing_item["duplicateReview"] = None
+            existing_item["updatedAt"] = utc_now_iso()
+            cosmos.upsert("review", existing_item)
+            return ReviewItem.model_validate(existing_item)
         return ReviewItem.model_validate(existing[0])
 
     item = ReviewItem(id=review_id, candidateId=candidate_id, record=record)

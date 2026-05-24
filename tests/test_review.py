@@ -7,6 +7,7 @@ from src.pipeline.deduplication import (
 )
 from src.pipeline.embeddings import build_provider_neutral_embedding_text
 from src.pipeline.groundedness import deterministic_groundedness, evaluate_groundedness
+from src.pipeline.agents import review_agent
 from src.pipeline.models import ExtractedRecord
 from src.pipeline.review import review_record
 
@@ -92,3 +93,85 @@ def test_groundedness_requires_model_deployment_by_default(monkeypatch):
         assert "AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT" in str(exc)
     else:
         raise AssertionError("Expected missing groundedness deployment to fail by default")
+
+
+def test_review_requeues_candidate_when_groundedness_below_rescrape_score(monkeypatch):
+    upserts = []
+
+    record = ExtractedRecord(
+        recordType="case",
+        title="A title",
+        summary="summary",
+        sourceUrl="https://example.com",
+    )
+    item = {
+        "id": "review-candidate-1",
+        "PartitionKey": "review",
+        "candidateId": "candidate-1",
+        "record": record.model_dump(),
+        "status": "queued",
+        "reasons": [],
+    }
+    candidate = {
+        "id": "candidate-1",
+        "PartitionKey": "candidate",
+        "sourceUrl": "https://example.com",
+        "status": "extracted",
+    }
+
+    def fake_query(alias, *args, **kwargs):
+        if alias == "candidates":
+            return [candidate]
+        return []
+
+    monkeypatch.setattr(review_agent.cosmos, "query", fake_query)
+    monkeypatch.setattr(review_agent.cosmos, "upsert", lambda alias, payload: upserts.append((alias, dict(payload))) or payload)
+    monkeypatch.setattr(review_agent, "create_record_embedding", lambda record, config: [0.1, 0.2])
+    monkeypatch.setattr(review_agent, "find_duplicate_record", lambda *args, **kwargs: None)
+    monkeypatch.setattr(review_agent, "fetch_source_text", lambda source_url: "source text")
+    monkeypatch.setattr(
+        review_agent,
+        "evaluate_groundedness",
+        lambda *args, **kwargs: {"score": 3, "result": "fail", "reason": "weak", "threshold": 3, "passed": True},
+    )
+
+    config = PipelineConfig()
+    result = review_agent.review_item(item, config)
+
+    assert result["status"] == "retrying"
+    assert result["scrapeRetryCount"] == 1
+    candidate_upsert = [payload for alias, payload in upserts if alias == "candidates"][0]
+    assert candidate_upsert["status"] == "queued"
+    assert candidate_upsert["rescrapeAttempt"] == 1
+    assert "Groundedness score 3" in candidate_upsert["rescrapeReason"]
+
+
+def test_review_rejects_when_groundedness_retry_limit_reached(monkeypatch):
+    upserts = []
+    record = ExtractedRecord(recordType="case", title="A title", summary="summary", sourceUrl="https://example.com")
+    item = {
+        "id": "review-candidate-1",
+        "PartitionKey": "review",
+        "candidateId": "candidate-1",
+        "record": record.model_dump(),
+        "status": "queued",
+        "scrapeRetryCount": 1,
+        "reasons": [],
+    }
+
+    monkeypatch.setattr(review_agent.cosmos, "query", lambda *args, **kwargs: [])
+    monkeypatch.setattr(review_agent.cosmos, "upsert", lambda alias, payload: upserts.append((alias, dict(payload))) or payload)
+    monkeypatch.setattr(review_agent, "create_record_embedding", lambda record, config: [0.1, 0.2])
+    monkeypatch.setattr(review_agent, "find_duplicate_record", lambda *args, **kwargs: None)
+    monkeypatch.setattr(review_agent, "fetch_source_text", lambda source_url: "source text")
+    monkeypatch.setattr(
+        review_agent,
+        "evaluate_groundedness",
+        lambda *args, **kwargs: {"score": 3, "result": "fail", "reason": "weak", "threshold": 3, "passed": True},
+    )
+
+    result = review_agent.review_item(item, PipelineConfig())
+
+    assert result["status"] == "rejected"
+    assert any("remained below 4" in reason for reason in result["reasons"])
+    assert not [payload for alias, payload in upserts if alias == "records"]

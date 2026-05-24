@@ -1,11 +1,16 @@
+import os
+from typing import Any
 from urllib.parse import parse_qs, unquote, urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
 from src.pipeline.config import PipelineConfig
+from src.pipeline.framework import agent_tool
 from src.pipeline.http_client import fetch_page
+from src.pipeline.llm import chat_json
 from src.pipeline.models import CandidateRecord
+from src.pipeline.prompt_templates import render_prompt_file
 from src.pipeline.queueing import enqueue_candidate
 from src.pipeline.source_registry import mark_source_visited, upsert_source_page
 
@@ -35,6 +40,50 @@ class SearchProviderBlockedError(SearchProviderError):
 class SearchProviderConfigurationError(SearchProviderError):
     def __init__(self, provider: str, message: str) -> None:
         super().__init__(provider, "not_configured", message)
+
+
+def normalize_generated_queries(payload: Any, limit: int) -> list[str]:
+    values = payload.get("queries") if isinstance(payload, dict) else payload
+    if not isinstance(values, list):
+        return []
+
+    queries: list[str] = []
+    for value in values:
+        query = str(value or "").strip()
+        if query and query not in queries:
+            queries.append(query)
+        if len(queries) >= limit:
+            break
+    return queries
+
+
+def generate_search_queries(config: PipelineConfig, source_urls: list[str] | None = None) -> list[str]:
+    deployment = os.getenv(config.llm.deploymentNameEnv)
+    if not deployment:
+        raise RuntimeError(f"Set {config.llm.deploymentNameEnv} before generating discovery search queries.")
+
+    max_query_count = max(1, config.sourceDiscovery.generatedSearchQueryCount)
+    prompt_values = {
+        "domainDescription": config.domainDescription,
+        "recordType": config.recordType,
+        "schemaJson": [field.model_dump() for field in config.recordSchema.fields],
+        "allowedDomains": config.sourceDiscovery.allowedDomains,
+        "seedUrls": source_urls or config.sourceDiscovery.seedUrls,
+        "maxQueryCount": max_query_count,
+    }
+    system_prompt = render_prompt_file(config.prompts.discoverySystem, prompt_values)
+    user_prompt = render_prompt_file(config.prompts.discoveryUser, prompt_values)
+    payload = chat_json(
+        system_prompt,
+        user_prompt,
+        deployment=deployment,
+        temperature=config.llm.temperature,
+        agent_name="discovery-agent",
+    )
+    queries = normalize_generated_queries(payload, max_query_count)
+    if not queries:
+        raise RuntimeError("Discovery query generation returned no usable search queries.")
+    return queries
 
 
 def is_allowed_url(url: str, allowed_domains: list[str], blocked_domains: list[str]) -> bool:
@@ -106,6 +155,11 @@ def yandex_search(query: str, limit: int = 10, timeout: int = 20) -> list[str]:
     return []
 
 
+@agent_tool(name="search_yandex", description="Run a low-volume Yandex web search and return discovered public result URLs as JSON.")
+def search_yandex_tool(query: str, limit: int = 10) -> str:
+    return {"results": yandex_search(query, limit=limit)}
+
+
 def extract_google_result_urls(payload: dict, limit: int = 10) -> list[str]:
     results: list[str] = []
     for item in payload.get("items") or []:
@@ -124,8 +178,6 @@ def extract_google_result_urls(payload: dict, limit: int = 10) -> list[str]:
 
 
 def google_search(query: str, config: PipelineConfig, limit: int = 10, timeout: int = 20) -> list[str]:
-    import os
-
     api_key = os.getenv(config.sourceDiscovery.googleApiKeyEnv)
     search_engine_id = os.getenv(config.sourceDiscovery.googleSearchEngineIdEnv)
     if not api_key or not search_engine_id:
@@ -142,6 +194,13 @@ def google_search(query: str, config: PipelineConfig, limit: int = 10, timeout: 
     )
     response.raise_for_status()
     return extract_google_result_urls(response.json(), limit=limit)
+
+
+@agent_tool(name="search_google", description="Run Google Custom Search and return discovered public result URLs as JSON.")
+def search_google_tool(query: str, limit: int = 10) -> str:
+    from src.pipeline.config import load_config
+
+    return {"results": google_search(query, load_config(), limit=limit)}
 
 
 def _enqueue_if_allowed(
@@ -182,6 +241,16 @@ def screen_sources(
     provider = search_provider or config.sourceDiscovery.searchProvider
     queries = config.sourceDiscovery.searchQueries if search_queries is None else search_queries
     if provider in {"yandex", "google"}:
+        if not queries:
+            try:
+                queries = generate_search_queries(config, source_urls)
+                if search_diagnostics is not None:
+                    search_diagnostics.append({"provider": provider, "status": "queries_generated", "queries": queries})
+            except Exception as exc:
+                if search_diagnostics is not None:
+                    search_diagnostics.append({"provider": provider, "status": "query_generation_failed", "message": str(exc)})
+                return queued
+
         for query in queries:
             if len(queued) >= max_links:
                 break

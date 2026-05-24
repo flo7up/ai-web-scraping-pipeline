@@ -35,3 +35,28 @@ def test_enqueue_review_uses_deterministic_id(monkeypatch):
     assert item.id == "review-candidate-1"
     assert stored[0][0] == "review"
     assert stored[0][1]["id"] == "review-candidate-1"
+
+
+def test_enqueue_review_refreshes_retrying_review_item(monkeypatch):
+    stored = []
+    existing = {
+        "id": "review-candidate-1",
+        "PartitionKey": "review",
+        "candidateId": "candidate-1",
+        "record": {"title": "Old"},
+        "status": "retrying",
+        "createdAt": "2026-05-24T00:00:00Z",
+        "updatedAt": "2026-05-24T00:00:00Z",
+        "reasons": ["retry"],
+        "scrapeRetryCount": 1,
+    }
+
+    monkeypatch.setattr(queueing.cosmos, "query", lambda *args, **kwargs: [existing])
+    monkeypatch.setattr(queueing.cosmos, "upsert", lambda alias, item: stored.append((alias, item)) or item)
+
+    item = queueing.enqueue_review("candidate-1", {"title": "New"})
+
+    assert item.id == "review-candidate-1"
+    assert item.record["title"] == "New"
+    assert item.status == "queued"
+    assert stored[0][1]["reasons"] == []

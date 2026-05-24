@@ -6,6 +6,8 @@ from typing import Any
 from azure.identity import DefaultAzureCredential
 from openai import AzureOpenAI
 
+from .framework import agent_framework_enabled, run_agent_json
+
 
 @lru_cache(maxsize=1)
 def azure_openai_client() -> AzureOpenAI | None:
@@ -26,9 +28,19 @@ def azure_openai_client() -> AzureOpenAI | None:
     return AzureOpenAI(azure_endpoint=endpoint, azure_ad_token_provider=token_provider, api_version=api_version)
 
 
-def chat_json(system_prompt: str, user_prompt: str, deployment: str | None, temperature: float = 0.1) -> dict[str, Any] | None:
+def chat_json(
+    system_prompt: str,
+    user_prompt: str,
+    deployment: str | None,
+    temperature: float = 0.1,
+    agent_name: str = "pipeline-agent",
+    tools: list | None = None,
+) -> dict[str, Any] | None:
     if not deployment:
         return None
+    if agent_framework_enabled():
+        return run_agent_json(agent_name, system_prompt, user_prompt, deployment, tools=tools)
+
     client = azure_openai_client()
     if client is None:
         return None

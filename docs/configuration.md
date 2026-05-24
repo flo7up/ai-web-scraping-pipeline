@@ -6,7 +6,8 @@ The primary configuration file is `pipeline.config.json`.
 
 - `seedUrls`: starting pages for exploration.
 - `searchProvider`: optional search provider for discovery. Supported values: `none`, `google`, `yandex`.
-- `searchQueries`: search queries to run when `searchProvider` is `google` or `yandex`.
+- `searchQueries`: search queries to run when `searchProvider` is `google` or `yandex`. If this is empty and a search provider is enabled, the Discovery agent uses the configured LLM to generate search queries from `domainDescription`, `recordType`, `schema.fields`, `allowedDomains`, and `seedUrls`.
+- `generatedSearchQueryCount`: maximum number of LLM-generated search queries to request when `searchQueries` is empty.
 - `searchMaxResults`: maximum search results to inspect per query.
 - `googleApiKeyEnv`: environment variable containing the Google Custom Search API key. Default: `GOOGLE_SEARCH_API_KEY`.
 - `googleSearchEngineIdEnv`: environment variable containing the Google Programmable Search Engine ID. Default: `GOOGLE_SEARCH_ENGINE_ID`.
@@ -16,6 +17,8 @@ The primary configuration file is `pipeline.config.json`.
 - `maxLinksPerSource`: candidate cap per source page.
 
 Google Custom Search is recommended for reliable search-based discovery because it provides a supported API, stable JSON responses, and clearer quota/error behavior. Yandex search support is intended for low-volume test and demo runs only. Search result pages can change, throttle automated requests, or return captcha challenges, so keep `maxLinksPerSource` and `searchMaxResults` small and fall back to explicit `seedUrls` for repeatable production runs.
+
+Discovery query generation uses the chat model deployment configured by `AZURE_OPENAI_DEPLOYMENT`.
 
 ## Schema
 
@@ -27,12 +30,16 @@ Schema fields describe the target record. Required fields are enforced by the re
 - `maxInputChars`: source text truncation to control cost.
 - `temperature`: keep low for structured extraction.
 
+Set `AZURE_AI_PROJECT_ENDPOINT` to route chat-style LLM calls through Microsoft Agent Framework and your Microsoft Foundry project. If `AZURE_AI_PROJECT_ENDPOINT` is not set, the pipeline uses the Azure OpenAI-compatible endpoint path configured by `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY`. Embeddings use `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` through the Azure OpenAI-compatible embeddings API.
+
 `allowDeterministicFallbackForSmokeTests` defaults to `false`. Keep it disabled for operational runs so missing model deployments fail fast instead of silently producing low-quality deterministic records. Enable it only for infrastructure smoke tests that intentionally avoid model calls.
 
 ## Prompt Templates
 
 - `prompts.extractionSystem`: system prompt file for structured extraction.
 - `prompts.extractionUser`: user prompt file for structured extraction.
+- `prompts.discoverySystem`: system prompt file for LLM-generated search query planning.
+- `prompts.discoveryUser`: user prompt file for LLM-generated search query planning.
 - `prompts.groundednessSystem`: system prompt file for groundedness review.
 - `prompts.groundednessUser`: user prompt file for groundedness review.
 
@@ -54,6 +61,8 @@ Configure an embedding deployment for the intended duplicate-review path. Exact 
 - `groundedness.deploymentNameEnv`: app setting containing the groundedness model deployment name, default `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT`.
 - `groundedness.maxInputChars`: maximum source text sent to the groundedness model.
 - `groundedness.threshold`: score threshold for pass/fail.
+- `groundedness.rescrapeBelowScore`: when groundedness score is below this value, the Review agent requeues the original candidate so the Extraction agent repeats the scrape and structured extraction.
+- `groundedness.maxRescrapeAttempts`: maximum number of low-groundedness rescrape attempts before the review item is rejected.
 - `groundedness.requirePass`: when true, failed groundedness rejects the review item. The default is false, so the result is stored as metadata.
 
 Configure a groundedness deployment for the intended review path. Do not treat deterministic token overlap as a substitute for model-based groundedness in operational runs.
