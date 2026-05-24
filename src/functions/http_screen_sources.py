@@ -17,7 +17,18 @@ def http_screen_sources(req: func.HttpRequest) -> func.HttpResponse:
         body = req.get_json() if req.get_body() else {}
         urls = body.get("urls") or config.sourceDiscovery.seedUrls
         max_links = int(body.get("maxLinks") or config.sourceDiscovery.maxLinksPerSource)
-        queued = [candidate.model_dump() for candidate in screen_sources(urls, max_links, config)]
+        queries = body.get("queries") if "queries" in body else None
+        search_provider = body.get("searchProvider") or None
+        queued = [
+            candidate.model_dump()
+            for candidate in screen_sources(
+                urls,
+                max_links,
+                config,
+                search_queries=queries,
+                search_provider=search_provider,
+            )
+        ]
 
         return func.HttpResponse(json.dumps({"queued": queued, "count": len(queued)}), mimetype="application/json")
     except Exception as exc:

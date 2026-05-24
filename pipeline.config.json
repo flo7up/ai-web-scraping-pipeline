@@ -4,6 +4,9 @@
   "domainDescription": "Public examples of enterprise AI deployments and implementation patterns.",
   "sourceDiscovery": {
     "seedUrls": [],
+    "searchProvider": "none",
+    "searchQueries": [],
+    "searchMaxResults": 10,
     "allowedDomains": [],
     "blockedDomains": [],
     "revisitFrequencyDays": 14,

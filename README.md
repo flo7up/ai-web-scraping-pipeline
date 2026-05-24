@@ -6,9 +6,9 @@ Example use cases are scraping news articles, success stories, construction proj
 
 The project is a configurable AI web scraping backend. You can define your own scraping engine, domain schema, llm, source URLs, and prompts.
 
-![AI Web Scraping Pipeline overview](./ai-web-scraping-pipeline-overview.png)
+![AI Web Scraping Pipeline schematic](./ai-web-scraping-pipeline-overview-schematic.png)
 
-The diagrams show the full model-enabled pipeline. The implementation uses Azure Functions and Cosmos DB containers for state and handoff; the default deployment does not require a separate Azure Queue Storage resource. Microsoft Foundry or Azure OpenAI deployments are required for useful runtime processing: configure chat extraction, embedding, and groundedness deployments before operational runs.
+The schematic shows how discovered web signals move through Discovery, Extraction, and Review before landing in Cosmos DB for search. It uses queues as the mental model for handoff; in this implementation those handoffs are Cosmos DB containers named `CandidateQueue` and `ReviewQueue`, so the default deployment does not require a separate Azure Queue Storage resource. Microsoft Foundry or Azure OpenAI deployments are required for useful runtime processing: configure chat extraction, embedding, and groundedness deployments before operational runs.
 
 ## What It Does
 
@@ -33,6 +33,8 @@ The pipeline is organized as three logical agents running inside one Azure Funct
 The agent business logic lives in `src/pipeline/agents/`. The Azure Function files under `src/functions/` are thin trigger adapters. Prompt templates live in `prompts/` and are referenced from `pipeline.config.json`, so domain instructions can be changed without editing Python code.
 
 The HTTP endpoints let you manually screen sources, extract a single URL, and search approved records. A timer function revisits source pages on a configurable schedule. Cosmos DB stores source registry state, queue documents, review decisions, approved records, run logs, and token usage.
+
+![AI Web Scraping Pipeline overview](./ai-web-scraping-pipeline-overview.png)
 
 ![AI Web Scraping Pipeline details](./ai-web-scraping-pipeline-details.png)
 
@@ -72,6 +74,7 @@ Edit `pipeline.config.json`:
 
 - `domainDescription`: what kind of records you want to find
 - `sourceDiscovery.seedUrls`: starting pages to explore
+- `sourceDiscovery.searchProvider` and `sourceDiscovery.searchQueries`: optional low-volume Yandex search discovery for tests and demos
 - `sourceDiscovery.allowedDomains`: optional domain allow-list
 - `schema.fields`: the structured output fields
 

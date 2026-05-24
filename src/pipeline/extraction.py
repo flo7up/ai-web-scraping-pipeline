@@ -26,6 +26,26 @@ def deterministic_extract(url: str, title: str, text: str, config: PipelineConfi
     )
 
 
+def _normalize_confidence(value: object) -> float:
+    if isinstance(value, int | float):
+        return max(0.0, min(float(value), 1.0))
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        labels = {
+            "low": 0.25,
+            "medium": 0.5,
+            "moderate": 0.5,
+            "high": 0.85,
+        }
+        if normalized in labels:
+            return labels[normalized]
+        try:
+            return max(0.0, min(float(normalized), 1.0))
+        except ValueError:
+            return 0.5
+    return 0.5
+
+
 def llm_extract(url: str, title: str, text: str, config: PipelineConfig) -> ExtractedRecord | None:
     deployment = os.getenv(config.llm.deploymentNameEnv)
     if not deployment:
@@ -45,11 +65,19 @@ def llm_extract(url: str, title: str, text: str, config: PipelineConfig) -> Extr
     data = chat_json(system_prompt, user_prompt, deployment=deployment, temperature=config.llm.temperature)
     if not data:
         return None
-    data.setdefault("sourceUrl", url)
-    data.setdefault("recordType", config.recordType)
-    data.setdefault("title", title or data.get("summary") or "Untitled record")
-    data.setdefault("summary", _first_sentence(text))
-    data.setdefault("rawFields", {})
+    if not data.get("sourceUrl"):
+        data["sourceUrl"] = url
+    if not data.get("recordType"):
+        data["recordType"] = config.recordType
+    if not data.get("title"):
+        data["title"] = title or data.get("summary") or "Untitled record"
+    if not data.get("summary"):
+        data["summary"] = _first_sentence(text)
+    if not isinstance(data.get("technologies"), list):
+        data["technologies"] = [str(data["technologies"])] if data.get("technologies") else []
+    data["confidence"] = _normalize_confidence(data.get("confidence"))
+    if not isinstance(data.get("rawFields"), dict):
+        data["rawFields"] = {}
     data["rawFields"]["extractionMode"] = "llm"
     return ExtractedRecord.model_validate(data)
 

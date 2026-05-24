@@ -5,10 +5,15 @@ The primary configuration file is `pipeline.config.json`.
 ## Source Discovery
 
 - `seedUrls`: starting pages for exploration.
+- `searchProvider`: optional search provider for discovery. Supported values: `none`, `yandex`.
+- `searchQueries`: search queries to run when `searchProvider` is `yandex`.
+- `searchMaxResults`: maximum search results to inspect per query.
 - `allowedDomains`: optional domain allow-list.
 - `blockedDomains`: domain block-list.
 - `revisitFrequencyDays`: when source pages become due again.
 - `maxLinksPerSource`: candidate cap per source page.
+
+Yandex search support is intended for low-volume test and demo runs. Search result pages can change or throttle automated requests, so keep `maxLinksPerSource` and `searchMaxResults` small and fall back to explicit `seedUrls` for repeatable production runs.
 
 ## Schema
 

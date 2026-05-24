@@ -2,6 +2,10 @@
 
 The pipeline is an Azure Functions app with queue-driven processing.
 
+![AI Web Scraping Pipeline schematic](../ai-web-scraping-pipeline-overview-schematic.png)
+
+The schematic shows the conceptual flow. The implementation uses Cosmos DB containers for queue-like handoff between agents rather than a separate Azure Queue Storage resource.
+
 ```mermaid
 flowchart LR
   Source[Source pages] --> Screen[HttpScreenSources]

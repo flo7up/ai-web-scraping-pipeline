@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 
 from . import cosmos
 
@@ -7,10 +8,14 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def source_page_id(url: str) -> str:
+    return sha256(url.strip().lower().encode("utf-8")).hexdigest()
+
+
 def upsert_source_page(url: str, revisit_frequency_days: int) -> dict:
     now = datetime.now(timezone.utc)
     item = {
-        "id": url,
+        "id": source_page_id(url),
         "pk": "SourcePage#default",
         "url": url,
         "active": True,
@@ -25,7 +30,7 @@ def mark_source_visited(url: str, revisit_frequency_days: int) -> dict:
     now = datetime.now(timezone.utc)
     next_visit = now + timedelta(days=revisit_frequency_days)
     item = {
-        "id": url,
+        "id": source_page_id(url),
         "pk": "SourcePage#default",
         "url": url,
         "active": True,

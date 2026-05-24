@@ -19,6 +19,9 @@ class SchemaConfig(BaseModel):
 
 class SourceDiscoveryConfig(BaseModel):
     seedUrls: list[str] = Field(default_factory=list)
+    searchProvider: Literal["none", "yandex"] = "none"
+    searchQueries: list[str] = Field(default_factory=list)
+    searchMaxResults: int = 10
     allowedDomains: list[str] = Field(default_factory=list)
     blockedDomains: list[str] = Field(default_factory=list)
     revisitFrequencyDays: int = 14

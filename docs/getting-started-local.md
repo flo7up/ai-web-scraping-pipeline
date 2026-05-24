@@ -85,6 +85,8 @@ Edit `pipeline.config.json`:
 
 - `domainDescription`: describe what you want to discover.
 - `sourceDiscovery.seedUrls`: add starting pages.
+- `sourceDiscovery.searchProvider`: set to `yandex` for a low-volume search-based smoke test.
+- `sourceDiscovery.searchQueries`: add search queries such as `site:example.com Example Domain`.
 - `sourceDiscovery.allowedDomains`: add a domain allow-list for safer early tests.
 - `sourceDiscovery.maxLinksPerSource`: keep this low, such as `3` to `5`, for the first run.
 - `schema.fields`: define the structured fields you expect.
@@ -161,6 +163,23 @@ Invoke-RestMethod -Method POST `
   -ContentType "application/json" `
   -Body $body
 ```
+
+To test Yandex-based discovery without changing `pipeline.config.json`, pass query overrides in the request body:
+
+```powershell
+$body = @{
+  searchProvider = "yandex"
+  queries = @("site:example.com Example Domain")
+  maxLinks = 1
+} | ConvertTo-Json
+
+Invoke-RestMethod -Method POST `
+  -Uri "http://localhost:7071/api/screen-sources" `
+  -ContentType "application/json" `
+  -Body $body
+```
+
+Yandex search is best for small smoke tests. For repeatable production runs, prefer curated `seedUrls` and domain allow-lists.
 
 After this succeeds, check the `CandidateQueue` container in Cosmos DB. The candidate trigger should process queued candidates when the Functions host is running and the Cosmos DB trigger connection is valid.
 
