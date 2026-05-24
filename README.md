@@ -1,17 +1,19 @@
 # Explorative Scraping Pipeline
 
-Open-source Azure Functions pipeline for discovering, extracting, reviewing, and storing structured records from public web sources.
+This repository provides an agentic webscraping pipeline for discovering, extracting, reviewing, and storing structured records from public web sources.
 
-The project is a configurable version of an explorative scraping backend: bring your own domain schema, source URLs, prompts, and Azure resources.
+Example use cases are scraping news articles, success stories, construction projects, or research articles
+
+The project is a configurable version of an explorative scraping backend. You can define your own scraping engine, domain schema, llm, source URLs, and prompts.
 
 ![Explorative Scraping Pipeline overview](./Explorative-scraping-pipeline-overview.png)
 
-The diagrams show the full model-enabled pipeline. The implementation uses Azure Functions and Cosmos DB containers for state and handoff; the default deployment does not require a separate Azure Queue Storage resource. Microsoft Foundry / Azure OpenAI deployments are optional at runtime: deterministic extraction and groundedness work without model calls, while configured model deployments enable LLM extraction, embeddings, and LLM groundedness checks.
+The diagrams show the full model-enabled pipeline. The implementation uses Azure Functions and Cosmos DB containers for state and handoff; the default deployment does not require a separate Azure Queue Storage resource. Microsoft Foundry or Azure OpenAI deployments are required at runtime for agentic features: deterministic extraction and groundedness work without model calls, while configured model deployments enable LLM extraction, embeddings, and LLM groundedness checks.
 
 ## What It Does
 
-- Discovers candidate links from source pages.
-- Extracts readable text from public URLs.
+- Discovers candidate links from source pages via a search engine.
+- Extracts readable text from public URLs, like news pages or blogs.
 - Uses deterministic extraction by default and optional Azure OpenAI structured extraction.
 - Reviews records against a configurable schema.
 - Checks for duplicates by exact source identity and, when embeddings are configured, provider-neutral vector similarity.
@@ -127,7 +129,7 @@ The workflow uses OIDC and does not require publish profiles.
 
 This repository can power different explorative scraping pipelines by changing config and prompts:
 
-- AI use case discovery, like AIUseCaseHub.com.
+- AI use case discovery, like AIUseCaseHub.com - the scraping engine has been powering the platform for almost a year and so far, scraped more than 2700 ai use cases.
 - Real estate project discovery across developer portfolios, planning portals, construction news, and investment announcements.
 - Customer case study discovery for a specific vendor ecosystem, including partners, products, industries, and outcomes.
 - Sustainability project discovery from ESG reports, climate-tech announcements, and public project pages.
