@@ -19,7 +19,7 @@ Use the Deploy to Azure button in the README to provision:
 - Azure AI Services resource for Microsoft Foundry / Azure OpenAI-compatible deployments
 - Application Insights and Log Analytics
 
-This path provisions resources and app settings. It does not deploy model deployments or publish Function App code. Use GitHub Actions or `azd up` when you also want to publish Function App code.
+This path provisions resources and app settings. It does not create model deployments or publish Function App code. Configure model deployments before operational runs, and use GitHub Actions or `azd up` when you also want to publish Function App code.
 
 ### Option B: Full deployment with Azure Developer CLI
 
@@ -44,17 +44,17 @@ Grant the federated identity permissions to deploy the resources in your target 
 
 ## Microsoft Foundry model setup
 
-The template creates an Azure AI Services resource, but it does not force a model deployment. This keeps one-click deployment broadly usable across subscriptions and quotas.
+The template creates an Azure AI Services resource, but it does not create model deployments. Treat model setup as a required post-deployment step before running the full pipeline.
 
 After deployment:
 
 1. Open the Azure AI Services resource in Microsoft Foundry.
 2. Deploy a chat model and set `AZURE_OPENAI_DEPLOYMENT` to the model deployment name.
 3. Deploy an embedding model and set `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` for vector duplicate detection.
-4. Optionally set `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT` for model-based groundedness checks.
+4. Deploy a groundedness model and set `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT` for model-based groundedness checks.
 5. Restart the Function App.
 
-Without these deployment settings, deterministic extraction and deterministic groundedness still work, and exact source URL duplicate detection remains available.
+Without these deployment settings, the Azure resources can exist but the pipeline is not ready for useful extraction, embedding-based duplicate review, or groundedness evaluation.
 
 ## Local Development
 

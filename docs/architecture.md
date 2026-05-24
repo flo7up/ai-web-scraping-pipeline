@@ -40,9 +40,9 @@ The `Records` container is deployed with a vector policy on `/embedding`. Approv
 
 ## Quality Features
 
-- Deduplication: exact normalized source URL/hash matches are treated as duplicates. When `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` is configured, the review stage also creates provider-neutral embeddings and searches existing records by vector distance.
+- Deduplication: exact normalized source URL/hash matches are treated as duplicates, and the intended review path creates provider-neutral embeddings with `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` so it can search existing records by vector distance.
 - Duplicate signals: vector similarity is combined with title similarity, organization overlap, content overlap, and technology overlap before a record is rejected as a duplicate.
-- Groundedness: approved records are checked against the fetched source text. If `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT` is set, the check uses the configured model; otherwise it uses a deterministic token-overlap fallback. Results are stored on the record and review item.
+- Groundedness: approved records are checked against the fetched source text with the configured `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT`. Results are stored on the record and review item.
 
 ## Configuration
 

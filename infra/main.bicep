@@ -9,13 +9,13 @@ param location string = resourceGroup().location
 @description('Create an Azure AI Services resource for Microsoft Foundry / Azure OpenAI compatible model deployments.')
 param createAzureAI bool = true
 
-@description('Optional Azure OpenAI / Foundry model deployment name. Leave empty to use deterministic extraction only.')
+@description('Azure OpenAI / Foundry chat model deployment name for structured extraction. Leave empty only while provisioning resources before model setup.')
 param azureOpenAIDeployment string = ''
 
-@description('Optional Azure OpenAI embedding deployment name used for embedding-based duplicate detection.')
+@description('Azure OpenAI embedding deployment name used for embedding-based duplicate detection. Leave empty only while provisioning resources before model setup.')
 param azureOpenAIEmbeddingDeployment string = ''
 
-@description('Optional Azure OpenAI / Foundry model deployment name used for groundedness checks. Leave empty to reuse deterministic groundedness fallback.')
+@description('Azure OpenAI / Foundry model deployment name used for groundedness checks. Leave empty only while provisioning resources before model setup.')
 param azureOpenAIGroundednessDeployment string = ''
 
 @description('Embedding dimensions for the Records container vector policy. Match the configured embedding model deployment.')

@@ -28,7 +28,7 @@ Schema fields describe the target record. Required fields are enforced by the re
 - `embedding.dimensions`: vector dimensions expected by the deployed Cosmos DB vector policy.
 - `embedding.maxInputChars`: maximum provider-neutral text sent to the embedding model.
 
-Embeddings are optional. Exact source URL duplicate detection still works without an embedding deployment.
+Configure an embedding deployment for the intended duplicate-review path. Exact source URL checks are only a narrow duplicate signal and are not a replacement for the embedding-based review flow.
 
 ## Groundedness
 
@@ -38,7 +38,7 @@ Embeddings are optional. Exact source URL duplicate detection still works withou
 - `groundedness.threshold`: score threshold for pass/fail.
 - `groundedness.requirePass`: when true, failed groundedness rejects the review item. The default is false, so the result is stored as metadata.
 
-When no groundedness deployment is configured, the pipeline uses a deterministic token-overlap fallback.
+Configure a groundedness deployment for the intended review path. Do not treat deterministic token overlap as a substitute for model-based groundedness in operational runs.
 
 ## Quality Gates
 

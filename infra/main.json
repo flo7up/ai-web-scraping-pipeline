@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "6173087461834583646"
+      "templateHash": "7061296338717594567"
     }
   },
   "parameters": {
@@ -33,21 +33,21 @@
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Optional Azure OpenAI / Foundry model deployment name. Leave empty to use deterministic extraction only."
+        "description": "Azure OpenAI / Foundry chat model deployment name for structured extraction. Leave empty only while provisioning resources before model setup."
       }
     },
     "azureOpenAIEmbeddingDeployment": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Optional Azure OpenAI embedding deployment name used for embedding-based duplicate detection."
+        "description": "Azure OpenAI embedding deployment name used for embedding-based duplicate detection. Leave empty only while provisioning resources before model setup."
       }
     },
     "azureOpenAIGroundednessDeployment": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Optional Azure OpenAI / Foundry model deployment name used for groundedness checks. Leave empty to reuse deterministic groundedness fallback."
+        "description": "Azure OpenAI / Foundry model deployment name used for groundedness checks. Leave empty only while provisioning resources before model setup."
       }
     },
     "embeddingDimensions": {

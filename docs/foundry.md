@@ -10,20 +10,20 @@ The Azure deployment provisions an Azure AI Services resource that can be used f
 
 ## Model Deployment
 
-The template does not deploy a model by default. This keeps provisioning predictable and avoids forcing a model choice or quota usage.
+The template creates the Azure AI Services resource but does not create model deployments. Configure model deployments before operational pipeline runs; empty deployment settings are suitable only while provisioning infrastructure.
 
 After deployment:
 
 1. Open the Azure AI Services resource in Microsoft Foundry.
 2. Create or select a project if prompted.
-3. Deploy a chat model appropriate for extraction.
-4. Copy the deployment name.
-5. Set the Function App app setting `AZURE_OPENAI_DEPLOYMENT` to that deployment name.
-6. Restart the Function App.
+3. Deploy a chat model appropriate for structured extraction.
+4. Deploy an embedding model for provider-neutral duplicate detection.
+5. Deploy a groundedness model for LLM groundedness checks.
+6. Set the Function App app settings `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_EMBEDDING_DEPLOYMENT`, and `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT` to those deployment names.
+7. Restart the Function App.
 
 ## Cost-Efficient Defaults
 
-- If `AZURE_OPENAI_DEPLOYMENT` is empty, extraction falls back to deterministic extraction.
 - Keep `llm.maxInputChars` in `pipeline.config.json` conservative.
 - Start with a small seed list and low `maxLinksPerSource`.
 - Monitor Application Insights and Azure AI token usage before increasing cadence.

@@ -8,19 +8,19 @@ The project is a configurable version of an explorative scraping backend. You ca
 
 ![Explorative Scraping Pipeline overview](./Explorative-scraping-pipeline-overview.png)
 
-The diagrams show the full model-enabled pipeline. The implementation uses Azure Functions and Cosmos DB containers for state and handoff; the default deployment does not require a separate Azure Queue Storage resource. Microsoft Foundry or Azure OpenAI deployments are required at runtime for agentic features: deterministic extraction and groundedness work without model calls, while configured model deployments enable LLM extraction, embeddings, and LLM groundedness checks.
+The diagrams show the full model-enabled pipeline. The implementation uses Azure Functions and Cosmos DB containers for state and handoff; the default deployment does not require a separate Azure Queue Storage resource. Microsoft Foundry or Azure OpenAI deployments are required for useful runtime processing: configure chat extraction, embedding, and groundedness deployments before operational runs.
 
 ## What It Does
 
 - Discovers candidate links from source pages via a search engine.
 - Extracts readable text from public URLs, like news pages or blogs.
-- Uses deterministic extraction by default and optional Azure OpenAI structured extraction.
+- Uses Azure OpenAI / Foundry model deployments for structured extraction.
 - Reviews records against a configurable schema.
 - Checks for duplicates by exact source identity and, when embeddings are configured, provider-neutral vector similarity.
 - Evaluates groundedness against the fetched source text and stores the score, result, reason, and threshold on approved records.
 - Stores candidates, review items, approved records, source pages, run logs, and token usage in Azure Cosmos DB.
 - Exposes HTTP endpoints for manual extraction, source screening, and searching stored records.
-- Deploys to Azure Functions with azd and Bicep.
+- Deploys to Azure Functions with azd and Bicep (with flex-consumption plan)
 
 ## Architecture At A Glance
 
@@ -48,7 +48,7 @@ Default deployment provisions:
 - Application Insights and Log Analytics.
 - Function app settings wired to Cosmos DB and the Azure AI endpoint.
 
-Model deployment is intentionally configurable: the template creates the Azure AI Services/Foundry-capable resource, then you choose deployment names and set `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_EMBEDDING_DEPLOYMENT`, and `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT` as needed. Deterministic extraction and deterministic groundedness fallback work without model calls.
+Model deployment is required for the intended pipeline. The template creates the Azure AI Services/Foundry-capable resource, but it does not create model deployments for you. Before running real scraping jobs, deploy the models you want to use and set `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_EMBEDDING_DEPLOYMENT`, and `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT`. Leaving deployment names empty is only useful for infrastructure smoke tests, not for high-quality extraction and review.
 
 ## Quick Start
 
@@ -105,12 +105,12 @@ azd auth login
 azd up
 ```
 
-After deployment, configure the model deployments you want to use:
+After deployment, configure the required model deployments:
 
 1. Open the provisioned Azure AI Services resource in Microsoft Foundry.
 2. Deploy a chat model and set `AZURE_OPENAI_DEPLOYMENT` for structured extraction.
 3. Deploy an embedding model and set `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` for vector duplicate detection.
-4. Optionally set `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT` for LLM groundedness checks; otherwise the pipeline uses deterministic token-overlap groundedness.
+4. Deploy a groundedness model and set `AZURE_OPENAI_GROUNDEDNESS_DEPLOYMENT` for LLM groundedness checks.
 5. Keep `llm.maxInputChars` and `groundedness.maxInputChars` conservative until you understand token usage.
 
 ### GitHub Actions
@@ -155,17 +155,15 @@ The pipeline behavior is controlled by `pipeline.config.json`:
 
 ## Cost Controls
 
-The default configuration is conservative:
+The default configuration is conservative, but model deployments are still expected for useful pipeline runs:
 
-- no model call is required for deterministic extraction
-- no model call is required for deterministic groundedness fallback
 - source text is truncated before model use
 - source pages have revisit intervals
 - candidate processing is queue based
 - model calls are logged by function and deployment
 - review-before-store can be enabled or disabled
 
-The main baseline cost in the current template is Cosmos DB provisioned throughput: each pipeline container receives dedicated RU/s. Pipeline frequency then scales variable costs through source fetches, Function executions, Cosmos operations, telemetry ingestion, and optional model calls. See `docs/cost-controls.md` for formulas and example scenarios.
+The main baseline cost in the current template is Cosmos DB provisioned throughput: each pipeline container receives dedicated RU/s. Pipeline frequency then scales variable costs through source fetches, Function executions, Cosmos operations, telemetry ingestion, and model calls. See `docs/cost-controls.md` for formulas and example scenarios.
 
 ## One-Click Deploy Button
 
